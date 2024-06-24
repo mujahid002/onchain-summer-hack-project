@@ -14,21 +14,130 @@ error FractionalNoun__Unauthorized();
 error FractionalNoun__ZeroAmount();
 error FractionalNoun__InsufficientBalance();
 error FractionalNoun__WithdrawalFailed();
+error FractionalNoun__UnableToCallTNounContract();
 
 /// @custom:security-contact mujahidshaik2002@gmail.com
 contract FractionalNoun is ERC1155, Ownable, ERC1155Supply, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
     address private s_tokenizedNounContractAddress;
 
-    mapping(address => uint256) private s_collectedAmount;
+    mapping(uint256 => uint256) private s_collectedAmount;
     mapping(uint256 => EnumerableSet.AddressSet) private s_fTokenIdToOwners;
 
-    constructor() ERC1155("https://tnouns/tokens/") Ownable(_msgSender()) {}
+    constructor(address _tokenizedNounContractAddress) ERC1155("https://fnouns/tokens/") Ownable(_msgSender()) {
+        s_tokenizedNounContractAddress=_tokenizedNounContractAddress;
+    }
 
     modifier onlyTokenizedNounContract() {
         if (msg.sender != s_tokenizedNounContractAddress)
             revert FractionalNoun__Unauthorized();
         _;
+    }
+
+
+    function setURI(string memory newURI) public onlyOwner {
+        _setURI(newURI);
+    }
+
+    function mintFNounToOwner(address userAddress, uint256 tNounId)
+        public
+        onlyTokenizedNounContract
+    {
+        uint8 totalParts = getNounParts(tNounId);
+        if (totalSupply(tNounId) >= totalParts)
+            revert FractionalNoun__InsufficientParts();
+        addAddress(tNounId, userAddress);
+        _mint(userAddress, tNounId, 1, "");
+    }
+
+    function mintFNoun(uint256 tNounId, uint256 _amount)
+        public
+        payable
+        nonReentrant
+    {
+        if (_amount == 0) revert FractionalNoun__ZeroAmount();
+        uint8 amount=uint8(_amount);
+        uint8 totalParts = getNounParts(tNounId);
+        uint8 currentSupply = uint8(totalSupply(tNounId));
+        if (amount > totalParts - currentSupply)
+            revert FractionalNoun__InsufficientParts();
+
+        (
+            bool successPrice,
+            bytes memory dataPrice
+        ) = s_tokenizedNounContractAddress.staticcall(
+                abi.encodeWithSignature(
+                    "getEachTokenPriceForNoun(uint256)",
+                    tNounId
+                )
+            );
+        if (!successPrice) revert FractionalNoun__InvalidAddress();
+        uint256 tokenPrice = abi.decode(dataPrice, (uint256));
+        if ((_amount * tokenPrice)/(10**18) != msg.value)
+            revert FractionalNoun__InvalidValue();
+
+        s_collectedAmount[tNounId] += msg.value;
+        if (!containsAddress(tNounId, _msgSender())) {
+            addAddress(tNounId, _msgSender());
+        }
+        _mint(msg.sender, tNounId, amount, "");
+    }
+
+
+    function burnFNounId(uint256 tNounId) public onlyTokenizedNounContract {
+        uint256 length = getAddressCount(tNounId);
+        address[] memory userAddresses = getAllAddresses(tNounId);
+        uint256[] memory ids = getIds(tNounId, length);
+        uint256[] memory values = balanceOfBatch(userAddresses, ids);
+        for (uint256 i = 0; i < length; ++i) {
+            _burn(userAddresses[i], ids[i], values[i]);
+        }
+    }
+
+    function withdraw(uint256 tNounId,uint256 amount) public nonReentrant {
+        if (amount == 0) revert FractionalNoun__ZeroAmount();
+        (
+            bool successOwnerOf,
+            bytes memory dataOwnerOf
+        ) = s_tokenizedNounContractAddress.staticcall(
+                abi.encodeWithSignature("ownerOf(uint256)", tNounId)
+            );
+        if (!successOwnerOf) revert FractionalNoun__InvalidAddress();
+        address ownerAddress = abi.decode(dataOwnerOf, (address));
+        if(ownerAddress!=_msgSender()) revert("Invalid Address");
+        if (s_collectedAmount[tNounId] < amount)
+            revert FractionalNoun__InsufficientBalance();
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        if (success) {
+            s_collectedAmount[tNounId] -= amount;
+        } else {
+            revert FractionalNoun__WithdrawalFailed();
+        }
+    }
+
+    function getNounParts(uint256 tNounId) public view returns (uint8) {
+        (bool success, bytes memory data) = s_tokenizedNounContractAddress
+            .staticcall(
+                abi.encodeWithSignature("getNounDivisor(uint256)", tNounId)
+            );
+        if (!success) revert FractionalNoun__UnableToCallTNounContract();
+        return abi.decode(data, (uint8));
+    }
+
+    function getTokenizedNounContractAddress() view public returns(address){
+        return s_tokenizedNounContractAddress;
+    } 
+
+    function getIds(uint256 id, uint256 length)
+        public
+        pure
+        returns (uint256[] memory ids)
+    {
+        ids = new uint256[](length);
+        for (uint256 i = 0; i < length; ++i) {
+            ids[i] = id;
+        }
     }
 
     function addAddress(uint256 key, address addr) public {
@@ -70,105 +179,6 @@ contract FractionalNoun is ERC1155, Ownable, ERC1155Supply, ReentrancyGuard {
         returns (bool)
     {
         return s_fTokenIdToOwners[key].contains(addr);
-    }
-
-    function setURI(string memory newURI) public onlyOwner {
-        _setURI(newURI);
-    }
-
-    function mintFNounToOwner(address userAddress, uint256 tNounId)
-        public
-        onlyTokenizedNounContract
-    {
-        uint8 totalParts = getNounParts(tNounId);
-        if (totalSupply(tNounId) >= totalParts)
-            revert FractionalNoun__InsufficientParts();
-        addAddress(tNounId, userAddress);
-        _mint(userAddress, tNounId, 1, "");
-    }
-
-    function getNounParts(uint256 tNounId) public view returns (uint8) {
-        (bool success, bytes memory data) = s_tokenizedNounContractAddress
-            .staticcall(
-                abi.encodeWithSignature("getNounDivisor(uint256)", tNounId)
-            );
-        if (!success) revert FractionalNoun__InvalidAddress();
-        return abi.decode(data, (uint8));
-    }
-
-    function mintFNoun(uint256 tNounId, uint256 amount)
-        public
-        payable
-        nonReentrant
-    {
-        if (amount == 0) revert FractionalNoun__ZeroAmount();
-        uint8 totalParts = getNounParts(tNounId);
-        uint256 currentSupply = totalSupply(tNounId);
-        if (amount > totalParts - currentSupply)
-            revert FractionalNoun__InsufficientParts();
-
-        (
-            bool successOwnerOf,
-            bytes memory dataOwnerOf
-        ) = s_tokenizedNounContractAddress.staticcall(
-                abi.encodeWithSignature("ownerOf(uint256)", tNounId)
-            );
-        if (!successOwnerOf) revert FractionalNoun__InvalidAddress();
-        address ownerAddress = abi.decode(dataOwnerOf, (address));
-
-        (
-            bool successPrice,
-            bytes memory dataPrice
-        ) = s_tokenizedNounContractAddress.staticcall(
-                abi.encodeWithSignature(
-                    "getEachTokenPriceForNoun(uint256)",
-                    tNounId
-                )
-            );
-        if (!successPrice) revert FractionalNoun__InvalidAddress();
-        uint256 tokenPrice = abi.decode(dataPrice, (uint256));
-        if (amount * tokenPrice != msg.value)
-            revert FractionalNoun__InvalidValue();
-
-        s_collectedAmount[ownerAddress] += msg.value;
-        if (!containsAddress(tNounId, _msgSender())) {
-            addAddress(tNounId, _msgSender());
-        }
-        _mint(msg.sender, tNounId, amount, "");
-    }
-
-    function burnFNounId(uint256 tNounId) public onlyTokenizedNounContract {
-        uint256 length = getAddressCount(tNounId);
-        address[] memory userAddresses = getAllAddresses(tNounId);
-        uint256[] memory ids = getIds(tNounId, length);
-        uint256[] memory values = balanceOfBatch(userAddresses, ids);
-        for (uint256 i = 0; i < length; ++i) {
-            _burn(userAddresses[i], ids[i], values[i]);
-        }
-    }
-
-    function getIds(uint256 id, uint256 length)
-        public
-        pure
-        returns (uint256[] memory ids)
-    {
-        ids = new uint256[](length);
-        for (uint256 i = 0; i < length; ++i) {
-            ids[i] = id;
-        }
-    }
-
-    function withdraw(uint256 amount) public nonReentrant {
-        if (amount == 0) revert FractionalNoun__ZeroAmount();
-        if (s_collectedAmount[msg.sender] < amount)
-            revert FractionalNoun__InsufficientBalance();
-
-        (bool success, ) = msg.sender.call{value: amount}("");
-        if (success) {
-            s_collectedAmount[msg.sender] -= amount;
-        } else {
-            revert FractionalNoun__WithdrawalFailed();
-        }
     }
 
     function _update(
