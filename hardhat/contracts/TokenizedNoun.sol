@@ -20,6 +20,7 @@ error TokenizedNoun__UnableToCallFNounContract();
 error TokenizedNoun__UnableToTransferNoun();
 error TokenizedNoun__UnableToGetAddresses();
 error TokenizedNoun__UnableToDistributeAmount();
+error TokenizedNoun__UnauthorizedUser();
 
 /// @custom:security-contact mujahidshaik2002@gmail.com
 contract TokenizedNoun is
@@ -53,6 +54,12 @@ contract TokenizedNoun is
         s_nounContractAddress = _nounContractAddress;
     }
 
+    modifier onlyTNounOwner(uint256 tNounId) {
+        if (ownerOf(tNounId) != _msgSender())
+            revert TokenizedNoun__UnauthorizedUser();
+        _;
+    }
+
     /**
      * @dev Handles the attestation event. This function is called when an attestation is made.
      * @param attestation The attestation data.
@@ -64,37 +71,37 @@ contract TokenizedNoun is
         override
         returns (bool)
     {
-        uint256 tNounId = nounId;
         // Check if the contract is the owner of the given nounId
-        if (checkContractIsOwnerForNounId(nounId)) {
-            // Verify that the attester is the owner of the tNounId
-            if (ownerOf(tNounId) != attestation.attester) return false;
-            // Ensure the noun's end timestamp is zero
-            if (getNounDetails(nounId).endTimestamp > 0) return false;
+        // if (checkContractIsOwnerForNounId(nounId)) {
+        //     // Verify that the attester is the owner of the tNounId
+        //     if (ownerOf(tNounId) != attestation.attester) return false;
+        //     // Ensure the noun's end timestamp is zero
+        //     if (getNounDetails(nounId).endTimestamp > 0) return false;
+        //     return true;
+        // } else {
+        // Attempt to approve the attestation
+        bool approved = _approveNoun(attestation.attester, nounId);
+        if (approved) {
+            // Transfer the noun from the attester to the contract
+            (bool checkTransfer, ) = s_nounContractAddress.call(
+                abi.encodeWithSignature(
+                    "transferFrom(address,address,uint256)",
+                    attestation.attester,
+                    address(this),
+                    nounId
+                )
+            );
+            // Return false if the transfer fails
+            if (!checkTransfer) return false;
+            uint256 tNounId = nounId;
+            // Mint a new token for the attester
+            _safeMint(attestation.attester, tNounId);
+
             return true;
         } else {
-            // Attempt to approve the attestation
-            bool approved = _approveNoun(attestation.attester, nounId);
-            if (approved) {
-                // Transfer the noun from the attester to the contract
-                (bool checkTransfer, ) = s_nounContractAddress.call(
-                    abi.encodeWithSignature(
-                        "transferFrom(address,address,uint256)",
-                        attestation.attester,
-                        address(this),
-                        nounId
-                    )
-                );
-                // Return false if the transfer fails
-                if (!checkTransfer) return false;
-                // Mint a new token for the attester
-                _safeMint(attestation.attester, tNounId);
-
-                return true;
-            } else {
-                return false;
-            }
+            return false;
         }
+        // }
     }
 
     /**
@@ -108,6 +115,10 @@ contract TokenizedNoun is
         return false;
     }
 
+    /*****************************
+        STATE UPDATE FUNCTIONS
+    ******************************/
+
     /**
      * @dev Sets the details for a tokenized noun, including the price and number of parts.
      *      Mints fractional tokens for the owner.
@@ -119,7 +130,7 @@ contract TokenizedNoun is
         uint256 tNounId,
         uint256 setNounPrice,
         uint8 parts
-    ) public {
+    ) public onlyTNounOwner(tNounId) {
         // Ensure the fractional noun contract address is set
         if (s_fractionalNounContractAddress == address(0))
             revert TokenizedNoun__InvalidInputAddress();
@@ -129,8 +140,8 @@ contract TokenizedNoun is
             revert TokenizedNoun__InvalidInputAmount();
 
         // Ensure the caller is the owner of the tokenized noun
-        if (ownerOf(tNounId) != _msgSender())
-            revert TokenizedNoun__InvalidCaller();
+        // if (ownerOf(tNounId) != _msgSender())
+        //     revert TokenizedNoun__InvalidCaller();
 
         // Set the noun details
         setNounDetails(tNounId, setNounPrice, parts);
@@ -151,7 +162,12 @@ contract TokenizedNoun is
      * @dev Withdraws a tokenized noun and its associated value, burns the fractional tokens, and transfers the original noun back to the owner.
      * @param tNounId The unique identifier for the tokenized noun.
      */
-    function withdrawNoun(uint256 tNounId) public payable nonReentrant {
+    function withdrawNoun(uint256 tNounId)
+        public
+        payable
+        nonReentrant
+        onlyTNounOwner(tNounId)
+    {
         // Ensure the fractional noun contract address is set
         if (s_fractionalNounContractAddress == address(0))
             revert TokenizedNoun__InvalidInputAddress();
@@ -161,8 +177,8 @@ contract TokenizedNoun is
             revert TokenizedNoun__NounIsLocked();
 
         // Ensure the caller is the owner of the tokenized noun
-        if (ownerOf(tNounId) != _msgSender())
-            revert TokenizedNoun__InvalidCaller();
+        // if (ownerOf(tNounId) != _msgSender())
+        //     revert TokenizedNoun__InvalidCaller();
 
         uint256 nounId = tNounId;
         uint256 totalValue = calculateTotalValue(tNounId);
@@ -267,12 +283,16 @@ contract TokenizedNoun is
     ) private {
         NounDetails memory newNounDetails = NounDetails({
             eachFNounPrice: nounTokenPrice,
-            endTimestamp: uint48(block.timestamp + 1 seconds), // Example: Set end timestamp after 1 second for testing
+            endTimestamp: uint48(block.timestamp + 52 weeks),
             divisor: totalParts
         });
 
         s_tNounIdDetails[tNounId] = newNounDetails;
     }
+
+    /*****************************
+        HELPER VIEW FUNCTIONS
+    ******************************/
 
     /**
      * @dev Compares if the end timestamp for a tokenized noun has passed.
@@ -288,20 +308,20 @@ contract TokenizedNoun is
      * @param nounId The unique identifier for the noun.
      * @return bool Returns true if the contract is the owner, otherwise false.
      */
-    function checkContractIsOwnerForNounId(uint256 nounId)
-        public
-        view
-        returns (bool)
-    {
-        (bool callOwnerOf, bytes memory addressInBytes) = s_nounContractAddress
-            .staticcall(abi.encodeWithSignature("ownerOf(uint256)", nounId));
-        if (!callOwnerOf) return false;
+    // function checkContractIsOwnerForNounId(uint256 nounId)
+    //     public
+    //     view
+    //     returns (bool)
+    // {
+    //     (bool callOwnerOf, bytes memory addressInBytes) = s_nounContractAddress
+    //         .staticcall(abi.encodeWithSignature("ownerOf(uint256)", nounId));
+    //     if (!callOwnerOf) return false;
 
-        address nounOwner = abi.decode(addressInBytes, (address));
+    //     address nounOwner = abi.decode(addressInBytes, (address));
 
-        if (nounOwner == address(this)) return true;
-        return false;
-    }
+    //     if (nounOwner == address(this)) return true;
+    //     return false;
+    // }
 
     /**
      * @dev Calculates the total value of a tokenized noun based on its token price and total supply.
@@ -362,6 +382,10 @@ contract TokenizedNoun is
 
         return true;
     }
+
+    /*****************************
+        GETTER FUNCTIONS
+    ******************************/
 
     /**
      * @dev Retrieves the address of the fractional noun contract.
@@ -452,66 +476,74 @@ contract TokenizedNoun is
         return super.supportsInterface(interfaceId);
     }
 
+    /*****************************
+        DEVELOPMENT FUNCTIONS
+    ******************************/
+
+    function withdraw() public onlyOwner {
+        payable(_msgSender()).transfer(address(this).balance);
+    }
+
     // For Testing only!
 
-    function mintTNoun(
-        uint256 nounId,
-        uint256 setNounPrice,
-        uint8 parts
-    ) public {
-        if (parts < 2 || parts > 255) revert();
-        if (s_fractionalNounContractAddress == address(0)) revert();
-        if (!transferNoun(_msgSender(), nounId))
-            revert TokenizedNoun__TransferFailed();
-        uint256 tNounId = nounId;
-        setNounDetails(tNounId, setNounPrice, parts);
-        (bool fNounMintStatus, ) = s_fractionalNounContractAddress.call(
-            abi.encodeWithSignature(
-                "mintFNounToOwner(address,uint256)",
-                _msgSender(),
-                tNounId
-            )
-        );
-        if (!fNounMintStatus) revert();
-        _safeMint(_msgSender(), tNounId);
-    }
+    // function mintTNoun(
+    //     uint256 nounId,
+    //     uint256 setNounPrice,
+    //     uint8 parts
+    // ) public {
+    //     if (parts < 2 || parts > 255) revert();
+    //     if (s_fractionalNounContractAddress == address(0)) revert();
+    //     if (!transferNoun(_msgSender(), nounId))
+    //         revert TokenizedNoun__TransferFailed();
+    //     uint256 tNounId = nounId;
+    //     setNounDetails(tNounId, setNounPrice, parts);
+    //     (bool fNounMintStatus, ) = s_fractionalNounContractAddress.call(
+    //         abi.encodeWithSignature(
+    //             "mintFNounToOwner(address,uint256)",
+    //             _msgSender(),
+    //             tNounId
+    //         )
+    //     );
+    //     if (!fNounMintStatus) revert();
+    //     _safeMint(_msgSender(), tNounId);
+    // }
 
-    function transferNoun(address userAddress, uint256 nounId)
-        private
-        returns (bool status)
-    {
-        status = false;
-        // Check ownership using low-level call
-        (bool successOwnerOf, bytes memory dataOwnerOf) = s_nounContractAddress
-            .staticcall(abi.encodeWithSignature("ownerOf(uint256)", nounId));
-        if (!successOwnerOf) revert TokenizedNoun__InvalidInputAddress();
+    // function transferNoun(address userAddress, uint256 nounId)
+    //     private
+    //     returns (bool status)
+    // {
+    //     status = false;
+    //     // Check ownership using low-level call
+    //     (bool successOwnerOf, bytes memory dataOwnerOf) = s_nounContractAddress
+    //         .staticcall(abi.encodeWithSignature("ownerOf(uint256)", nounId));
+    //     if (!successOwnerOf) revert TokenizedNoun__InvalidInputAddress();
 
-        address owner = abi.decode(dataOwnerOf, (address));
-        if (owner != userAddress) revert TokenizedNoun__NotOwner();
+    //     address owner = abi.decode(dataOwnerOf, (address));
+    //     if (owner != userAddress) revert TokenizedNoun__NotOwner();
 
-        // Check approval using low-level call
-        (
-            bool successGetApproved,
-            bytes memory dataGetApproved
-        ) = s_nounContractAddress.staticcall(
-                abi.encodeWithSignature("getApproved(uint256)", nounId)
-            );
-        if (!successGetApproved) revert TokenizedNoun__InvalidInputAddress();
+    //     // Check approval using low-level call
+    //     (
+    //         bool successGetApproved,
+    //         bytes memory dataGetApproved
+    //     ) = s_nounContractAddress.staticcall(
+    //             abi.encodeWithSignature("getApproved(uint256)", nounId)
+    //         );
+    //     if (!successGetApproved) revert TokenizedNoun__InvalidInputAddress();
 
-        address approvedAddress = abi.decode(dataGetApproved, (address));
-        if (approvedAddress != address(this))
-            revert TokenizedNoun__NotApproved();
+    //     address approvedAddress = abi.decode(dataGetApproved, (address));
+    //     if (approvedAddress != address(this))
+    //         revert TokenizedNoun__NotApproved();
 
-        (bool checkTransfer, ) = s_nounContractAddress.call(
-            abi.encodeWithSignature(
-                "transferFrom(address,address,uint256)",
-                userAddress,
-                address(this),
-                nounId
-            )
-        );
-        if (!checkTransfer) revert TokenizedNoun__TransferFailed();
+    //     (bool checkTransfer, ) = s_nounContractAddress.call(
+    //         abi.encodeWithSignature(
+    //             "transferFrom(address,address,uint256)",
+    //             userAddress,
+    //             address(this),
+    //             nounId
+    //         )
+    //     );
+    //     if (!checkTransfer) revert TokenizedNoun__TransferFailed();
 
-        status = true;
-    }
+    //     status = true;
+    // }
 }
