@@ -24,7 +24,7 @@ async function main() {
   );
   await tokenizedNoun.waitForDeployment();
   const tokenizedNounAddress = await tokenizedNoun.getAddress();
-  console.log("Vault Contract Address:", tokenizedNounAddress);
+  console.log("Tokenized Noun Address:", tokenizedNounAddress);
   console.log("----------------------------------------------------------");
 
   // Fractional Noun
