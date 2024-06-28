@@ -46,6 +46,10 @@ contract FractionalNoun is ERC1155, Ownable, ERC1155Supply, ReentrancyGuard {
         _;
     }
 
+    /*****************************
+        STATE UPDATE FUNCTIONS
+    ******************************/
+
     /**
      * @dev Mint a fractional Noun token to the owner's address.
      * @param userAddress The address to mint the token to.
@@ -189,6 +193,10 @@ contract FractionalNoun is ERC1155, Ownable, ERC1155Supply, ReentrancyGuard {
         s_tokenizedNounContractAddress = newTokenizedNounAddress;
     }
 
+    /*****************************
+        GETTER FUNCTIONS
+    ******************************/
+
     /**
      * @dev Get the amount of collected Ether for a specific tokenized Noun ID.
      * @param tNounId The unique identifier for the tokenized noun.
@@ -237,6 +245,10 @@ contract FractionalNoun is ERC1155, Ownable, ERC1155Supply, ReentrancyGuard {
             ids[i] = id;
         }
     }
+
+    /*****************************
+        HELPER FUNCTIONS
+    ******************************/
 
     function safeTransferFrom(
         address from,
