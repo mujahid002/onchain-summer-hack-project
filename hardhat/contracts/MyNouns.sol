@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: mujahid002
 pragma solidity ^0.8.20;
 
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {ERC721Enumerable, ERC721} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @custom:security-contact mujahidshaik2002@gmail.com
-contract MyNouns is ERC721, Ownable {
+contract MyNouns is ERC721Enumerable, Ownable {
     uint256 private s_nounId;
 
     constructor() ERC721("MyNounTokens", "MNT") Ownable(_msgSender()) {
@@ -27,6 +27,15 @@ contract MyNouns is ERC721, Ownable {
     }
 
     function _baseURI() internal pure override returns (string memory) {
-        return "For Testing Only!";
+        return "https://noun.pics/";
+    }
+
+    function tokenURI(uint256 nounId)
+        public
+        view
+        override
+        returns (string memory)
+    {
+        return super.tokenURI(nounId);
     }
 }
