@@ -4,16 +4,18 @@ This project includes code source for project building on Base (L2) for onchain 
 
 ## Deployed & Verified Contracts
 
-MyNouns Contract Address: 0x5539dFfaFe2785Ae0B1301001076c11f3af4eB67
-TokenizedNoun Contract Address: 0xE2E39B1A5eFe07743F9E0E8408F1B7aAB6B7f832
-FractionalNoun Contract Address: 0x5E36A22751f56aECE9A970beac728De684E7Bd1E
+MyNouns Contract Address: 0x4fA3F94C97fa9733A63F3056919325E96A45f81e
+TokenizedNoun Contract Address: 0x8EDFFa01e86B1f039b6C168b7f8813169a662364
+FractionalNoun Contract Address: 0x996eFcF698c4a15C7CA48b55d280D0849C658Da2
 
-1. https://sepolia.basescan.org/address/0x5539dFfaFe2785Ae0B1301001076c11f3af4eB67#code
-2. https://sepolia.basescan.org/address/0xE2E39B1A5eFe07743F9E0E8408F1B7aAB6B7f832#code
-3. https://sepolia.basescan.org/address/0x5E36A22751f56aECE9A970beac728De684E7Bd1E#code
+1. https://sepolia.basescan.org/address/0x4fA3F94C97fa9733A63F3056919325E96A45f81e#code
+2. https://sepolia.basescan.org/address/0x8EDFFa01e86B1f039b6C168b7f8813169a662364#code
+3. https://sepolia.basescan.org/address/0x996eFcF698c4a15C7CA48b55d280D0849C658Da2#code
 
-Schema Id: 0x3e16989065842dfb77cab2c6287b555dc29e1c0e122598f679428ca409a7cbe2
-https://base-sepolia.easscan.org/schema/view/0x3e16989065842dfb77cab2c6287b555dc29e1c0e122598f679428ca409a7cbe2
+Create Your Own Schems: https://base-sepolia.easscan.org/schema/create
+
+Schema Id: 0x32e5a79e9c42d718566403dfd00c6b43ca597bd70b0e008fbca003465c2ed13d
+https://base-sepolia.easscan.org/schema/view/0x32e5a79e9c42d718566403dfd00c6b43ca597bd70b0e008fbca003465c2ed13d
 
 ## Thoughts & Ideas:
 
