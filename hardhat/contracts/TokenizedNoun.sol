@@ -63,24 +63,18 @@ contract TokenizedNoun is
     /**
      * @dev Handles the attestation event. This function is called when an attestation is made.
      * @param attestation The attestation data.
-     * @param nounId The unique identifier for the noun.
      * @return bool Returns true if the attestation is successful, otherwise false.
      */
-    function onAttest(Attestation calldata attestation, uint256 nounId)
-        internal
-        override
-        returns (bool)
-    {
-        // Check if the contract is the owner of the given nounId
-        // if (checkContractIsOwnerForNounId(nounId)) {
-        //     // Verify that the attester is the owner of the tNounId
-        //     if (ownerOf(tNounId) != attestation.attester) return false;
-        //     // Ensure the noun's end timestamp is zero
-        //     if (getNounDetails(nounId).endTimestamp > 0) return false;
-        //     return true;
-        // } else {
-        // Attempt to approve the attestation
-        bool approved = _approveNoun(attestation.attester, nounId);
+    function onAttest(
+        Attestation calldata attestation,
+        uint256 /*value*/
+    ) internal override returns (bool) {
+        (, , , uint256 NounId, , , ) = abi.decode(
+            attestation.data,
+            (address, address, address, uint256, uint256, uint48, uint8)
+        );
+
+        bool approved = _approveNoun(attestation.attester, NounId);
         if (approved) {
             // Transfer the noun from the attester to the contract
             (bool checkTransfer, ) = s_nounContractAddress.call(
@@ -88,12 +82,12 @@ contract TokenizedNoun is
                     "transferFrom(address,address,uint256)",
                     attestation.attester,
                     address(this),
-                    nounId
+                    NounId
                 )
             );
             // Return false if the transfer fails
             if (!checkTransfer) return false;
-            uint256 tNounId = nounId;
+            uint256 tNounId = NounId;
             // Mint a new token for the attester
             _safeMint(attestation.attester, tNounId);
 
@@ -101,7 +95,6 @@ contract TokenizedNoun is
         } else {
             return false;
         }
-        // }
     }
 
     /**
