@@ -2,6 +2,12 @@
 
 This project includes code source for project building on Base (L2) for onchain summer hackathon
 
+## Frontend
+
+Basic Website: https://github.com/mujahid002/nounshard-frontend
+
+For comprehensive understanding with all resources, visit: https://mujahid.gitbook.io/nounshards/
+
 ## Deployed & Verified Contracts
 
 MyNouns Contract Address: 0x4fA3F94C97fa9733A63F3056919325E96A45f81e
