@@ -20,6 +20,10 @@ contract MyNouns is ERC721Enumerable, Ownable {
         s_nounId+=1;
         _safeMint(to, nounId);
     }
+    function burnNoun(uint256 nounId) public onlyOwner {
+                _burn(nounId);
+
+    }
 
     function getNounId() public view returns (uint256) {
         return s_nounId;
