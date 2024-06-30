@@ -15,14 +15,13 @@ contract MyNouns is ERC721Enumerable, Ownable {
         }
     }
 
-    function mintNouns(address to, uint256 amount) public onlyOwner {
-        s_nounId += amount;
-        for (uint256 i = 0; i < amount; ++i) {
-            _safeMint(to, i);
-        }
+    function mintNoun(address to) public onlyOwner {
+        uint256 nounId=getNounId();
+        s_nounId+=1;
+        _safeMint(to, nounId);
     }
 
-    function getTokenId() public view returns (uint256) {
+    function getNounId() public view returns (uint256) {
         return s_nounId;
     }
 
